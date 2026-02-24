@@ -1,5 +1,5 @@
 {
-  "name": "",
-  "description": "",
+  "name": "MagnaMath",
+  "description": "Educational app for learning about complex geometries in 3D and 2D, while also providing a pattern generator for Magna-Tiles.",
   "requestFramePermissions": []
 }

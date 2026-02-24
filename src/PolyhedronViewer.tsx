@@ -1,11 +1,20 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { extractPolyhedra, buildSpanningTree, computeTransforms, PolyFace, PolyEdge, HingeNode, getPolygonSides } from './geometry';
+import { extractPolyhedra, buildSpanningForest, computeTransforms, PolyFace, PolyEdge, HingeNode, getPolygonSides, getVertexKey, getEdgeKey, classifyFace, TileType } from './geometry';
+
+export interface GeometryStats {
+  tileCounts: Record<number, number>;
+  tileTypeCounts: Record<string, number>;
+  totalFaces: number;
+  totalEdges: number;
+  totalVertices: number;
+}
 
 interface PolyhedronViewerProps {
   geometry: THREE.BufferGeometry;
   unfoldProgress: number;
-  onTileCountsChange?: (counts: Record<number, number>) => void;
+  onStatsChange?: (stats: GeometryStats) => void;
+  tileColors?: Record<string, string>;
 }
 
 const TILE_COLORS: Record<number, string> = {
@@ -16,21 +25,43 @@ const TILE_COLORS: Record<number, string> = {
   8: '#a855f7', // Purple for octagons
 };
 
-export function PolyhedronViewer({ geometry, unfoldProgress, onTileCountsChange }: PolyhedronViewerProps) {
-  const { polyFaces, polyEdges, spanningTree, faceGeometries, polyFacesMap, tileCounts, faceSides } = useMemo(() => {
+export function PolyhedronViewer({ geometry, unfoldProgress, onStatsChange, tileColors }: PolyhedronViewerProps) {
+  const { polyFaces, polyEdges, spanningForest, faceGeometries, polyFacesMap, stats, faceSides, faceTypes } = useMemo(() => {
     const { polyFaces, polyEdges } = extractPolyhedra(geometry);
-    const spanningTree = buildSpanningTree(polyFaces, polyEdges);
+    const spanningForest = buildSpanningForest(polyFaces, polyEdges);
     
     const polyFacesMap = new Map<number, PolyFace>();
     const counts: Record<number, number> = {};
+    const typeCounts: Record<string, number> = {};
     const faceSides = new Map<number, number>();
+    const faceTypes = new Map<number, TileType>();
+    const uniqueVertices = new Set<string>();
 
     for (const pf of polyFaces) {
       polyFacesMap.set(pf.id, pf);
       const sides = getPolygonSides(pf);
+      const type = classifyFace(pf);
+      
       faceSides.set(pf.id, sides);
+      faceTypes.set(pf.id, type);
+      
       counts[sides] = (counts[sides] || 0) + 1;
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+      
+      for (const t of pf.triangles) {
+        uniqueVertices.add(getVertexKey(t.vertices[0]));
+        uniqueVertices.add(getVertexKey(t.vertices[1]));
+        uniqueVertices.add(getVertexKey(t.vertices[2]));
+      }
     }
+    
+    const stats: GeometryStats = {
+      tileCounts: counts,
+      tileTypeCounts: typeCounts,
+      totalFaces: polyFaces.length,
+      totalEdges: polyEdges.length,
+      totalVertices: uniqueVertices.size
+    };
     
     const faceGeometries = polyFaces.map(pf => {
       const geom = new THREE.BufferGeometry();
@@ -46,22 +77,51 @@ export function PolyhedronViewer({ geometry, unfoldProgress, onTileCountsChange 
       return geom;
     });
     
-    return { polyFaces, polyEdges, spanningTree, faceGeometries, polyFacesMap, tileCounts: counts, faceSides };
+    return { polyFaces, polyEdges, spanningForest, faceGeometries, polyFacesMap, stats, faceSides, faceTypes };
   }, [geometry]);
 
   React.useEffect(() => {
-    if (onTileCountsChange) {
-      onTileCountsChange(tileCounts);
+    if (onStatsChange) {
+      onStatsChange(stats);
     }
-  }, [tileCounts, onTileCountsChange]);
+  }, [stats, onStatsChange]);
 
   const transforms = useMemo(() => {
     const map = new Map<number, THREE.Matrix4>();
-    if (spanningTree) {
-      computeTransforms(spanningTree, polyFacesMap, unfoldProgress, new THREE.Matrix4(), map);
+    if (spanningForest) {
+      for (const tree of spanningForest) {
+        // Calculate root face normal and center to align it to the ground (Y-up)
+        const rootFace = polyFacesMap.get(tree.faceId);
+        let initialMatrix = new THREE.Matrix4();
+
+        if (rootFace) {
+          // Calculate centroid
+          const center = new THREE.Vector3();
+          let count = 0;
+          for (const t of rootFace.triangles) {
+            center.add(t.vertices[0]).add(t.vertices[1]).add(t.vertices[2]);
+            count += 3;
+          }
+          if (count > 0) center.divideScalar(count);
+
+          // Calculate rotation to align normal to (0, 1, 0)
+          const normal = rootFace.normal.clone().normalize();
+          const up = new THREE.Vector3(0, 1, 0);
+          const quaternion = new THREE.Quaternion().setFromUnitVectors(normal, up);
+
+          // Create transform: Translate to origin -> Rotate -> (Optional: Translate up slightly?)
+          // We want the face to be flat on the ground (y=0)
+          const t1 = new THREE.Matrix4().makeTranslation(-center.x, -center.y, -center.z);
+          const r = new THREE.Matrix4().makeRotationFromQuaternion(quaternion);
+          
+          initialMatrix.multiply(r).multiply(t1);
+        }
+
+        computeTransforms(tree, polyFacesMap, unfoldProgress, initialMatrix, map);
+      }
     }
     return map;
-  }, [spanningTree, polyFacesMap, unfoldProgress]);
+  }, [spanningForest, polyFacesMap, unfoldProgress]);
 
   return (
     <group>
@@ -75,7 +135,44 @@ export function PolyhedronViewer({ geometry, unfoldProgress, onTileCountsChange 
         matrix.decompose(position, quaternion, scale);
         
         const sides = faceSides.get(pf.id) || 3;
-        const color = TILE_COLORS[sides] || '#f97316'; // Default orange
+        const type = faceTypes.get(pf.id) || 'Other';
+        
+        let color = '#f97316'; // Default orange
+        if (tileColors) {
+          color = tileColors[type] || tileColors[sides] || color;
+        } else {
+          color = TILE_COLORS[sides] || color;
+        }
+
+        // Create rim geometry from outer edges
+        const rimVertices: number[] = [];
+        const edgeCounts = new Map<string, number>();
+        for (const t of pf.triangles) {
+          const edges = [
+            [t.vertices[0], t.vertices[1]],
+            [t.vertices[1], t.vertices[2]],
+            [t.vertices[2], t.vertices[0]]
+          ];
+          for (const [vA, vB] of edges) {
+            const key = getEdgeKey(vA, vB);
+            edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
+          }
+        }
+        for (const t of pf.triangles) {
+          const edges = [
+            [t.vertices[0], t.vertices[1]],
+            [t.vertices[1], t.vertices[2]],
+            [t.vertices[2], t.vertices[0]]
+          ];
+          for (const [vA, vB] of edges) {
+            const key = getEdgeKey(vA, vB);
+            if (edgeCounts.get(key) === 1) {
+              rimVertices.push(vA.x, vA.y, vA.z, vB.x, vB.y, vB.z);
+            }
+          }
+        }
+        const rimGeometry = new THREE.BufferGeometry();
+        rimGeometry.setAttribute('position', new THREE.Float32BufferAttribute(rimVertices, 3));
 
         return (
           <group key={pf.id} position={position} quaternion={quaternion} scale={scale}>
@@ -95,9 +192,8 @@ export function PolyhedronViewer({ geometry, unfoldProgress, onTileCountsChange 
                 clearcoatRoughness={0.1}
               />
             </mesh>
-            {/* Solid rim */}
-            <lineSegments>
-              <edgesGeometry args={[faceGeometries[i], 1]} />
+            {/* Solid rim - now using only outer edges */}
+            <lineSegments geometry={rimGeometry}>
               <lineBasicMaterial color={color} linewidth={4} />
             </lineSegments>
           </group>

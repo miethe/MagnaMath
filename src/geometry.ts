@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 
+export type TileType = 
+  | 'Small Square' 
+  | 'Equilateral Triangle' 
+  | 'Isosceles Triangle (Tall)' 
+  | 'Isosceles Triangle (Short)' 
+  | 'Right Triangle' 
+  | 'Hexagon' 
+  | 'Octagon'
+  | 'Other';
+
 export interface Triangle {
   id: number;
   vertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
@@ -56,6 +66,49 @@ export function getPolygonSides(pf: PolyFace): number {
   return outerEdges;
 }
 
+export function classifyFace(pf: PolyFace): TileType {
+  const sides = getPolygonSides(pf);
+  
+  if (sides === 4) return 'Small Square';
+  if (sides === 6) return 'Hexagon';
+  if (sides === 8) return 'Octagon';
+  
+  if (sides === 3) {
+    const t = pf.triangles[0];
+    const v1 = t.vertices[0];
+    const v2 = t.vertices[1];
+    const v3 = t.vertices[2];
+    
+    const d12 = v1.distanceTo(v2);
+    const d23 = v2.distanceTo(v3);
+    const d31 = v3.distanceTo(v1);
+    
+    const lengths = [d12, d23, d31].sort((a, b) => a - b);
+    const [s1, s2, s3] = lengths;
+    
+    // Equilateral: all sides roughly equal
+    if (Math.abs(s3 - s1) < 0.05 * s3) return 'Equilateral Triangle';
+    
+    // Right Triangle: a^2 + b^2 = c^2
+    if (Math.abs(s1*s1 + s2*s2 - s3*s3) < 0.1 * s3*s3) return 'Right Triangle';
+    
+    // Isosceles: two sides equal
+    if (Math.abs(s1 - s2) < 0.05 * s3 || Math.abs(s2 - s3) < 0.05 * s3) {
+      // Tall vs Short
+      // Tall usually has 2 long sides, 1 short base. s1=s2 < s3 (Wait, if s1=s2 and s3 is long, it's wide)
+      // Actually, Tall Isosceles in Magna-Tiles has s1 < s2=s3.
+      if (Math.abs(s2 - s3) < 0.05 * s3) {
+        if (s3 / s1 > 1.2) return 'Isosceles Triangle (Tall)';
+      }
+      return 'Isosceles Triangle (Short)';
+    }
+    
+    return 'Equilateral Triangle'; // Fallback
+  }
+  
+  return 'Other';
+}
+
 export function extractPolyhedra(geometry: THREE.BufferGeometry) {
   const nonIndexed = geometry.toNonIndexed();
   const positions = nonIndexed.attributes.position.array;
@@ -68,7 +121,11 @@ export function extractPolyhedra(geometry: THREE.BufferGeometry) {
     
     const cb = new THREE.Vector3().subVectors(v2, v1);
     const ab = new THREE.Vector3().subVectors(v0, v1);
-    const normal = new THREE.Vector3().crossVectors(cb, ab).normalize();
+    const cross = new THREE.Vector3().crossVectors(cb, ab);
+    
+    if (cross.lengthSq() < 1e-10) continue; // Skip degenerate triangles
+    
+    const normal = cross.normalize();
     
     triangles.push({
       id: i / 9,
@@ -151,17 +208,13 @@ export function extractPolyhedra(geometry: THREE.BufferGeometry) {
   return { polyFaces, polyEdges };
 }
 
-export function buildSpanningTree(polyFaces: PolyFace[], polyEdges: PolyEdge[]): HingeNode | null {
-  if (polyFaces.length === 0) return null;
+export function buildSpanningForest(polyFaces: PolyFace[], polyEdges: PolyEdge[]): HingeNode[] {
+  if (polyFaces.length === 0) return [];
   
-  const rootFace = polyFaces[0];
-  const tree: HingeNode = { faceId: rootFace.id, parentFaceId: null, hingeEdge: null, children: [] };
-  
+  const forest: HingeNode[] = [];
   const visited = new Set<number>();
-  visited.add(rootFace.id);
   
-  const queue: { node: HingeNode }[] = [{ node: tree }];
-  
+  // Build adjacency list
   const adj = new Map<number, PolyEdge[]>();
   for (const e of polyEdges) {
     if (!adj.has(e.face1)) adj.set(e.face1, []);
@@ -170,27 +223,38 @@ export function buildSpanningTree(polyFaces: PolyFace[], polyEdges: PolyEdge[]):
     adj.get(e.face2)!.push(e);
   }
   
-  while (queue.length > 0) {
-    const { node } = queue.shift()!;
-    const edges = adj.get(node.faceId) || [];
+  // Iterate through all faces to find connected components
+  for (const rootFace of polyFaces) {
+    if (visited.has(rootFace.id)) continue;
     
-    for (const e of edges) {
-      const neighborId = e.face1 === node.faceId ? e.face2 : e.face1;
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        const childNode: HingeNode = {
-          faceId: neighborId,
-          parentFaceId: node.faceId,
-          hingeEdge: e,
-          children: []
-        };
-        node.children.push(childNode);
-        queue.push({ node: childNode });
+    const tree: HingeNode = { faceId: rootFace.id, parentFaceId: null, hingeEdge: null, children: [] };
+    forest.push(tree);
+    visited.add(rootFace.id);
+    
+    const queue: { node: HingeNode }[] = [{ node: tree }];
+    
+    while (queue.length > 0) {
+      const { node } = queue.shift()!;
+      const edges = adj.get(node.faceId) || [];
+      
+      for (const e of edges) {
+        const neighborId = e.face1 === node.faceId ? e.face2 : e.face1;
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId);
+          const childNode: HingeNode = {
+            faceId: neighborId,
+            parentFaceId: node.faceId,
+            hingeEdge: e,
+            children: []
+          };
+          node.children.push(childNode);
+          queue.push({ node: childNode });
+        }
       }
     }
   }
   
-  return tree;
+  return forest;
 }
 
 export function computeTransforms(
