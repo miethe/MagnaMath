@@ -1,5 +1,70 @@
 import * as THREE from 'three';
 
+// Helper to subdivide a geometry
+function subdivideGeometry(geometry: THREE.BufferGeometry, subdivisions: number): THREE.BufferGeometry {
+  if (subdivisions <= 1) return geometry;
+  
+  let currentGeom = geometry.clone();
+  
+  // Simple subdivision: split each triangle into 4 smaller triangles
+  for (let s = 1; s < subdivisions; s++) {
+    const posAttr = currentGeom.attributes.position;
+    const indexAttr = currentGeom.index;
+    
+    if (!indexAttr) {
+      currentGeom.computeVertexNormals();
+      return currentGeom;
+    }
+    
+    const newPositions: number[] = [];
+    const newIndices: number[] = [];
+    
+    // Copy original positions
+    for (let i = 0; i < posAttr.count; i++) {
+      newPositions.push(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+    }
+    
+    const edgeMap = new Map<string, number>();
+    
+    const getMidpoint = (v1Idx: number, v2Idx: number) => {
+      const key = v1Idx < v2Idx ? `${v1Idx}_${v2Idx}` : `${v2Idx}_${v1Idx}`;
+      if (edgeMap.has(key)) return edgeMap.get(key)!;
+      
+      const v1 = new THREE.Vector3().fromBufferAttribute(posAttr, v1Idx);
+      const v2 = new THREE.Vector3().fromBufferAttribute(posAttr, v2Idx);
+      const mid = new THREE.Vector3().addVectors(v1, v2).multiplyScalar(0.5);
+      
+      const newIdx = newPositions.length / 3;
+      newPositions.push(mid.x, mid.y, mid.z);
+      edgeMap.set(key, newIdx);
+      return newIdx;
+    };
+    
+    for (let i = 0; i < indexAttr.count; i += 3) {
+      const a = indexAttr.getX(i);
+      const b = indexAttr.getX(i + 1);
+      const c = indexAttr.getX(i + 2);
+      
+      const ab = getMidpoint(a, b);
+      const bc = getMidpoint(b, c);
+      const ca = getMidpoint(c, a);
+      
+      newIndices.push(a, ab, ca);
+      newIndices.push(b, bc, ab);
+      newIndices.push(c, ca, bc);
+      newIndices.push(ab, bc, ca);
+    }
+    
+    const nextGeom = new THREE.BufferGeometry();
+    nextGeom.setAttribute('position', new THREE.Float32BufferAttribute(newPositions, 3));
+    nextGeom.setIndex(newIndices);
+    currentGeom = nextGeom;
+  }
+  
+  currentGeom.computeVertexNormals();
+  return currentGeom;
+}
+
 export type ShapeFamily = 'Platonic' | 'Prism' | 'Antiprism' | 'Pyramid' | 'Bipyramid' | 'Geodesic' | 'Torus';
 export type SymmetryType = 'None' | 'Mirror X' | 'Mirror Y' | 'Mirror Z';
 
@@ -60,7 +125,8 @@ export function generateShape(params: ShapeParams): { geometry: THREE.BufferGeom
 
   if (params.family === 'Platonic') {
     baseName = params.platonicType;
-    const detail = params.detail || 0;
+    // Use tessellation as the detail parameter for Platonic solids to allow them to be spherized
+    const detail = Math.max(0, tess - 1); 
     switch (baseName) {
       case 'Tetrahedron': geom = new THREE.TetrahedronGeometry(r, detail); break;
       case 'Cube': geom = new THREE.BoxGeometry(r*1.5, r*1.5, r*1.5, tess, tess, tess); break;
@@ -144,6 +210,11 @@ export function generateShape(params: ShapeParams): { geometry: THREE.BufferGeom
   } else {
     geom = new THREE.BoxGeometry(r, r, r, tess, tess, tess);
     baseName = 'Cube';
+  }
+
+  // Simple subdivision for custom geometries (Antiprism, Bipyramid) if tessellation > 1
+  if (tess > 1 && ['Antiprism', 'Bipyramid'].includes(params.family)) {
+    geom = subdivideGeometry(geom, tess);
   }
 
   // Apply Curvature (Spherize)
