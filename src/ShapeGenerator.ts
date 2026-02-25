@@ -247,28 +247,28 @@ export function generateShape(params: ShapeParams): { geometry: THREE.BufferGeom
     const originalGeom = geom.clone();
     const mirrorGeom = geom.clone();
     const scale = new THREE.Vector3(1, 1, 1);
-    const offset = new THREE.Vector3();
     
     // Offset to separate the mirrored shapes slightly (by radius)
     const separation = r * 0.1; // Small gap
 
+    if (params.symmetry === 'Mirror X') scale.x = -1;
+    if (params.symmetry === 'Mirror Y') scale.y = -1;
+    if (params.symmetry === 'Mirror Z') scale.z = -1;
+    
+    mirrorGeom.scale(scale.x, scale.y, scale.z);
+
     if (params.symmetry === 'Mirror X') {
-      scale.x = -1;
       originalGeom.translate(separation, 0, 0);
       mirrorGeom.translate(-separation, 0, 0);
     }
     if (params.symmetry === 'Mirror Y') {
-      scale.y = -1;
       originalGeom.translate(0, separation, 0);
       mirrorGeom.translate(0, -separation, 0);
     }
     if (params.symmetry === 'Mirror Z') {
-      scale.z = -1;
       originalGeom.translate(0, 0, separation);
       mirrorGeom.translate(0, 0, -separation);
     }
-    
-    mirrorGeom.scale(scale.x, scale.y, scale.z);
     
     // Fix winding order for mirrored geometry (restore outward normals)
     // Mirroring flips winding order (CCW -> CW). We need to swap vertices/indices to restore CCW.

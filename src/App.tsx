@@ -20,9 +20,11 @@ import {
   CheckCircle2,
   Circle,
   Lightbulb,
+  GraduationCap
 } from "lucide-react";
 import { InfoTooltip } from "./components/InfoTooltip";
 import { getShapeFacts } from "./utils/shapeFacts";
+import { TutorialMode } from "./components/TutorialMode";
 
 const DEFAULT_TILE_INVENTORY: Record<
   string,
@@ -46,6 +48,14 @@ const GENERAL_COLORS: Record<number, string> = {
   8: "#a855f7",
 };
 
+const getSidesFromType = (type: string): number => {
+  if (type === "Small Square") return 4;
+  if (type === "Hexagon") return 6;
+  if (type === "Octagon") return 8;
+  if (type.includes("Triangle")) return 3;
+  return 0;
+};
+
 export default function App() {
   const [shapeParams, setShapeParams] = useState<ShapeParams>({
     family: "Platonic",
@@ -67,6 +77,7 @@ export default function App() {
   const [isPaneOpen, setIsPaneOpen] = useState(true);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   const [tileInventory, setTileInventory] = useState(DEFAULT_TILE_INVENTORY);
   const [restrictToInventory, setRestrictToInventory] = useState(false);
@@ -86,6 +97,26 @@ export default function App() {
       return colors;
     } else {
       const colors: Record<string, string> = {};
+      
+      const getShade = (hex: string, lOffset: number) => {
+        const c = new THREE.Color(hex);
+        const hsl = { h: 0, s: 0, l: 0 };
+        c.getHSL(hsl);
+        c.setHSL(hsl.h, hsl.s, Math.max(0, Math.min(1, hsl.l + lOffset)));
+        return '#' + c.getHexString();
+      };
+
+      const baseTriangle = generalColors[3] || "#ef4444";
+      colors["Equilateral Triangle"] = baseTriangle;
+      colors["Isosceles Triangle (Tall)"] = getShade(baseTriangle, -0.15);
+      colors["Isosceles Triangle (Short)"] = getShade(baseTriangle, 0.15);
+      colors["Right Triangle"] = getShade(baseTriangle, -0.25);
+      
+      colors["Small Square"] = generalColors[4] || "#3b82f6";
+      colors["Hexagon"] = generalColors[6] || "#22c55e";
+      colors["Octagon"] = generalColors[8] || "#a855f7";
+      colors["Other"] = "#71717a";
+
       Object.entries(generalColors).forEach(([sides, color]) => {
         colors[sides] = color;
       });
@@ -280,6 +311,13 @@ export default function App() {
               `(${getPolyhedronName(stats.totalFaces)})`}
           </span>
           <button
+            onClick={() => setIsTutorialOpen(true)}
+            className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-200 transition-all active:scale-95 shadow-sm"
+          >
+            <GraduationCap size={16} />
+            <span className="hidden sm:inline">Tutorial Mode</span>
+          </button>
+          <button
             onClick={() => setIsDialogOpen(true)}
             className="flex items-center gap-2 bg-neutral-900 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-neutral-800 transition-all active:scale-95 shadow-lg shadow-neutral-900/20"
           >
@@ -288,6 +326,8 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {isTutorialOpen && <TutorialMode onClose={() => setIsTutorialOpen(false)} />}
 
       <main className="flex-1 relative flex">
         {/* Left Pane: Shape Details */}
@@ -330,7 +370,10 @@ export default function App() {
                         <span
                           className="w-3.5 h-3.5 rounded-md inline-block shadow-sm"
                           style={{
-                            backgroundColor: tileColors[type] || "#71717a",
+                            backgroundColor:
+                              tileColors[type] ||
+                              tileColors[getSidesFromType(type)] ||
+                              "#71717a",
                           }}
                         ></span>
                         {type}

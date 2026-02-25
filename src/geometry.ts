@@ -110,7 +110,7 @@ export function classifyFace(pf: PolyFace): TileType {
 }
 
 export function extractPolyhedra(geometry: THREE.BufferGeometry) {
-  const nonIndexed = geometry.toNonIndexed();
+  const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry;
   const positions = nonIndexed.attributes.position.array;
   const triangles: Triangle[] = [];
   
