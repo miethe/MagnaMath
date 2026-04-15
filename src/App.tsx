@@ -35,23 +35,28 @@ const DEFAULT_TILE_INVENTORY: Record<
   "Isosceles Triangle (Tall)": { enabled: true, color: "#f97316" },
   "Isosceles Triangle (Short)": { enabled: true, color: "#eab308" },
   "Right Triangle": { enabled: true, color: "#22c55e" },
+  Pentagon: { enabled: true, color: "#f43f5e" },
   Hexagon: { enabled: true, color: "#a855f7" },
   Octagon: { enabled: true, color: "#ec4899" },
+  Decagon: { enabled: true, color: "#14b8a6" },
   Other: { enabled: true, color: "#71717a" },
 };
 
 const GENERAL_COLORS: Record<number, string> = {
   3: "#ef4444",
   4: "#3b82f6",
-  5: "#eab308",
+  5: "#f43f5e",
   6: "#22c55e",
   8: "#a855f7",
+  10: "#14b8a6",
 };
 
 const getSidesFromType = (type: string): number => {
   if (type === "Small Square") return 4;
+  if (type === "Pentagon") return 5;
   if (type === "Hexagon") return 6;
   if (type === "Octagon") return 8;
+  if (type === "Decagon") return 10;
   if (type.includes("Triangle")) return 3;
   return 0;
 };
@@ -60,6 +65,8 @@ export default function App() {
   const [shapeParams, setShapeParams] = useState<ShapeParams>({
     family: "Platonic",
     platonicType: "Cube",
+    archimedeanType: "Truncated Tetrahedron",
+    johnsonType: "Square Pyramid",
     sides: 6,
     radius: 1.5,
     height: 2,
@@ -113,8 +120,10 @@ export default function App() {
       colors["Right Triangle"] = getShade(baseTriangle, -0.25);
       
       colors["Small Square"] = generalColors[4] || "#3b82f6";
+      colors["Pentagon"] = generalColors[5] || "#f43f5e";
       colors["Hexagon"] = generalColors[6] || "#22c55e";
       colors["Octagon"] = generalColors[8] || "#a855f7";
+      colors["Decagon"] = generalColors[10] || "#14b8a6";
       colors["Other"] = "#71717a";
 
       Object.entries(generalColors).forEach(([sides, color]) => {
@@ -433,6 +442,25 @@ export default function App() {
                   </div>
                 </>
               )}
+
+              <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-3 mt-8 flex items-center gap-1.5">
+                <GraduationCap size={12} className="text-indigo-500" />
+                Learning Center
+              </h3>
+              <div className="bg-indigo-50/30 border border-indigo-100/50 p-4 rounded-2xl space-y-4">
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-indigo-900">Shape Families</h4>
+                  <p className="text-[11px] text-indigo-700/80 leading-relaxed">
+                    Explore different categories of polyhedra. From the perfect symmetry of <b>Platonic Solids</b> to the semi-regular <b>Archimedean Solids</b> and the diverse <b>Johnson Solids</b>.
+                  </p>
+                </div>
+                <div className="space-y-1.5 pt-2 border-t border-indigo-100/50">
+                  <h4 className="text-xs font-bold text-indigo-900">Educational Updates</h4>
+                  <p className="text-[11px] text-indigo-700/80 leading-relaxed">
+                    We've added <b>Pentagons</b> and <b>Decagons</b> to our tile library to support more complex geometries like the Truncated Icosahedron (Soccer Ball).
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -633,6 +661,8 @@ export default function App() {
                     }
                   >
                     <option value="Platonic">Platonic Solid</option>
+                    <option value="Archimedean">Archimedean Solid</option>
+                    <option value="Johnson">Johnson Solid</option>
                     <option value="Prism">Prism</option>
                     <option value="Antiprism">Antiprism</option>
                     <option value="Pyramid">Pyramid</option>
@@ -642,56 +672,62 @@ export default function App() {
                   </select>
                 </div>
 
-                {shapeParams.family === "Platonic" && (
+                {shapeParams.family === "Archimedean" && (
                   <div className="col-span-2">
                     <label className="flex items-center text-sm font-bold text-neutral-700 mb-2">
-                      Type
+                      Archimedean Type
                       <InfoTooltip
-                        title="Platonic Solid Type"
-                        description="The specific regular polyhedron. There are only 5 in existence: Tetrahedron (4 faces), Cube (6), Octahedron (8), Dodecahedron (12), and Icosahedron (20)."
-                        animationType="sides"
+                        title="Archimedean Solids"
+                        description="Semi-regular polyhedra composed of two or more types of regular polygons meeting in identical vertices."
+                        animationType="family"
                       />
                     </label>
                     <select
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-sm font-medium rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 block p-3 outline-none transition-all shadow-sm"
-                      value={shapeParams.platonicType}
+                      value={shapeParams.archimedeanType}
                       onChange={(e) =>
                         setShapeParams({
                           ...shapeParams,
-                          platonicType: e.target.value as any,
+                          archimedeanType: e.target.value as any,
                         })
                       }
                     >
-                      <option
-                        value="Tetrahedron"
-                        disabled={isOptionDisabled("Platonic", "Tetrahedron")}
-                      >
-                        Tetrahedron
-                      </option>
-                      <option
-                        value="Cube"
-                        disabled={isOptionDisabled("Platonic", "Cube")}
-                      >
-                        Cube
-                      </option>
-                      <option
-                        value="Octahedron"
-                        disabled={isOptionDisabled("Platonic", "Octahedron")}
-                      >
-                        Octahedron
-                      </option>
-                      <option
-                        value="Dodecahedron"
-                        disabled={isOptionDisabled("Platonic", "Dodecahedron")}
-                      >
-                        Dodecahedron
-                      </option>
-                      <option
-                        value="Icosahedron"
-                        disabled={isOptionDisabled("Platonic", "Icosahedron")}
-                      >
-                        Icosahedron
-                      </option>
+                      <option value="Truncated Tetrahedron">Truncated Tetrahedron</option>
+                      <option value="Cuboctahedron">Cuboctahedron</option>
+                      <option value="Truncated Cube">Truncated Cube</option>
+                      <option value="Truncated Octahedron">Truncated Octahedron</option>
+                      <option value="Rhombicuboctahedron">Rhombicuboctahedron</option>
+                      <option value="Truncated Icosahedron">Truncated Icosahedron (Soccer Ball)</option>
+                    </select>
+                  </div>
+                )}
+
+                {shapeParams.family === "Johnson" && (
+                  <div className="col-span-2">
+                    <label className="flex items-center text-sm font-bold text-neutral-700 mb-2">
+                      Johnson Type
+                      <InfoTooltip
+                        title="Johnson Solids"
+                        description="Strictly convex polyhedra whose faces are regular polygons but which are not uniform."
+                        animationType="family"
+                      />
+                    </label>
+                    <select
+                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-sm font-medium rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 block p-3 outline-none transition-all shadow-sm"
+                      value={shapeParams.johnsonType}
+                      onChange={(e) =>
+                        setShapeParams({
+                          ...shapeParams,
+                          johnsonType: e.target.value as any,
+                        })
+                      }
+                    >
+                      <option value="Square Pyramid">Square Pyramid</option>
+                      <option value="Pentagonal Pyramid">Pentagonal Pyramid</option>
+                      <option value="Triangular Cupola">Triangular Cupola</option>
+                      <option value="Square Cupola">Square Cupola</option>
+                      <option value="Pentagonal Cupola">Pentagonal Cupola</option>
+                      <option value="Pentagonal Rotunda">Pentagonal Rotunda</option>
                     </select>
                   </div>
                 )}

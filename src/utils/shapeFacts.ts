@@ -21,6 +21,24 @@ export function getShapeFacts(params: ShapeParams, totalFaces: number, totalEdge
       if (params.platonicType === 'Dodecahedron') facts.push("The regular dodecahedron is composed of 12 regular pentagonal faces.");
       if (params.platonicType === 'Icosahedron') facts.push("An icosahedron has 20 faces. Many viruses, such as herpes and rhinovirus, have icosahedral shells.");
       break;
+    case 'Archimedean':
+      facts.push("Archimedean solids are semi-regular polyhedra composed of two or more types of regular polygons meeting in identical vertices.");
+      if (params.archimedeanType === 'Truncated Tetrahedron') facts.push("A truncated tetrahedron is formed by cutting off the corners of a tetrahedron, resulting in 4 triangles and 4 hexagons.");
+      if (params.archimedeanType === 'Cuboctahedron') facts.push("A cuboctahedron is a polyhedron with 8 triangular faces and 6 square faces. It's the dual of the rhombic dodecahedron.");
+      if (params.archimedeanType === 'Truncated Cube') facts.push("A truncated cube has 8 triangular faces and 6 octagonal faces.");
+      if (params.archimedeanType === 'Truncated Octahedron') facts.push("A truncated octahedron has 6 square faces and 8 hexagonal faces. It can tile 3D space.");
+      if (params.archimedeanType === 'Rhombicuboctahedron') facts.push("A rhombicuboctahedron has 8 triangular and 18 square faces.");
+      if (params.archimedeanType === 'Truncated Icosahedron') facts.push("The truncated icosahedron is the shape of a soccer ball and a C60 buckminsterfullerene molecule.");
+      break;
+    case 'Johnson':
+      facts.push("Johnson solids are strictly convex polyhedra whose faces are regular polygons but which are not uniform.");
+      if (params.johnsonType === 'Square Pyramid') facts.push("A square pyramid has a square base and 4 triangular sides.");
+      if (params.johnsonType === 'Pentagonal Pyramid') facts.push("A pentagonal pyramid has a pentagonal base and 5 triangular sides.");
+      if (params.johnsonType === 'Triangular Cupola') facts.push("A triangular cupola is a Johnson solid with 4 triangles, 3 squares, and 1 hexagon.");
+      if (params.johnsonType === 'Square Cupola') facts.push("A square cupola is a Johnson solid with 8 triangles, 5 squares, and 1 octagon.");
+      if (params.johnsonType === 'Pentagonal Cupola') facts.push("A pentagonal cupola is a Johnson solid with 10 triangles, 6 squares, and 1 decagon.");
+      if (params.johnsonType === 'Pentagonal Rotunda') facts.push("A pentagonal rotunda is a Johnson solid with 10 triangles, 6 pentagons, and 1 decagon.");
+      break;
     case 'Prism':
       facts.push(`A ${params.sides}-gonal prism consists of two ${params.sides}-sided bases connected by ${params.sides} rectangular sides.`);
       if (params.sides === 3) facts.push("Triangular prisms are commonly used in optics to disperse light into a spectrum.");

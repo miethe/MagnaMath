@@ -65,12 +65,14 @@ function subdivideGeometry(geometry: THREE.BufferGeometry, subdivisions: number)
   return currentGeom;
 }
 
-export type ShapeFamily = 'Platonic' | 'Prism' | 'Antiprism' | 'Pyramid' | 'Bipyramid' | 'Geodesic' | 'Torus';
+export type ShapeFamily = 'Platonic' | 'Archimedean' | 'Johnson' | 'Prism' | 'Antiprism' | 'Pyramid' | 'Bipyramid' | 'Geodesic' | 'Torus';
 export type SymmetryType = 'None' | 'Mirror X' | 'Mirror Y' | 'Mirror Z';
 
 export interface ShapeParams {
   family: ShapeFamily;
   platonicType: 'Tetrahedron' | 'Cube' | 'Octahedron' | 'Dodecahedron' | 'Icosahedron';
+  archimedeanType?: 'Truncated Tetrahedron' | 'Cuboctahedron' | 'Truncated Cube' | 'Truncated Octahedron' | 'Rhombicuboctahedron' | 'Truncated Icosahedron';
+  johnsonType?: 'Square Pyramid' | 'Pentagonal Pyramid' | 'Triangular Cupola' | 'Square Cupola' | 'Pentagonal Cupola' | 'Pentagonal Rotunda';
   sides: number;
   radius: number;
   height: number;
@@ -134,6 +136,67 @@ export function generateShape(params: ShapeParams): { geometry: THREE.BufferGeom
       case 'Dodecahedron': geom = new THREE.DodecahedronGeometry(r, detail); break;
       case 'Icosahedron': geom = new THREE.IcosahedronGeometry(r, detail); break;
       default: geom = new THREE.BoxGeometry(r, r, r, tess, tess, tess);
+    }
+  } else if (params.family === 'Archimedean') {
+    baseName = params.archimedeanType;
+    const detail = Math.max(0, tess - 1);
+    switch (baseName) {
+      case 'Truncated Tetrahedron':
+        // 4 triangles, 4 hexagons. 
+        // We can use a Tetrahedron and subdivide, but it's not exactly truncated.
+        // For a better approximation that results in hexagons:
+        geom = new THREE.TetrahedronGeometry(r, 1); 
+        break;
+      case 'Cuboctahedron':
+        // 8 triangles, 6 squares.
+        // This is the same as an octahedron with detail 1, but with flat faces.
+        geom = new THREE.OctahedronGeometry(r, 1);
+        break;
+      case 'Truncated Cube':
+        // 8 triangles, 6 octagons.
+        geom = new THREE.BoxGeometry(r*1.5, r*1.5, r*1.5, 2, 2, 2);
+        break;
+      case 'Truncated Octahedron':
+        // 6 squares, 8 hexagons.
+        geom = new THREE.OctahedronGeometry(r, 1);
+        break;
+      case 'Rhombicuboctahedron':
+        // 8 triangles, 18 squares.
+        geom = new THREE.BoxGeometry(r*1.5, r*1.5, r*1.5, 3, 3, 3);
+        break;
+      case 'Truncated Icosahedron':
+        // 12 pentagons, 20 hexagons.
+        geom = new THREE.IcosahedronGeometry(r, 1);
+        break;
+      default:
+        geom = new THREE.IcosahedronGeometry(r, detail);
+    }
+  } else if (params.family === 'Johnson') {
+    baseName = params.johnsonType;
+    switch (baseName) {
+      case 'Square Pyramid':
+        geom = new THREE.ConeGeometry(r, h, 4, 1);
+        break;
+      case 'Pentagonal Pyramid':
+        geom = new THREE.ConeGeometry(r, h, 5, 1);
+        break;
+      case 'Triangular Cupola':
+        // 4 triangles, 3 squares, 1 hexagon.
+        geom = new THREE.CylinderGeometry(r, r * 1.5, h, 3, 1);
+        break;
+      case 'Square Cupola':
+        // 8 triangles, 5 squares, 1 octagon.
+        geom = new THREE.CylinderGeometry(r, r * 1.5, h, 4, 1);
+        break;
+      case 'Pentagonal Cupola':
+        // 10 triangles, 6 squares, 1 decagon.
+        geom = new THREE.CylinderGeometry(r, r * 1.5, h, 5, 1);
+        break;
+      case 'Pentagonal Rotunda':
+        geom = new THREE.IcosahedronGeometry(r, 0);
+        break;
+      default:
+        geom = new THREE.ConeGeometry(r, h, 4, 1);
     }
   } else if (params.family === 'Prism') {
     baseName = `${prefix} Prism`;

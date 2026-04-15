@@ -6,8 +6,10 @@ export type TileType =
   | 'Isosceles Triangle (Tall)' 
   | 'Isosceles Triangle (Short)' 
   | 'Right Triangle' 
+  | 'Pentagon'
   | 'Hexagon' 
   | 'Octagon'
+  | 'Decagon'
   | 'Other';
 
 export interface Triangle {
@@ -70,8 +72,10 @@ export function classifyFace(pf: PolyFace): TileType {
   const sides = getPolygonSides(pf);
   
   if (sides === 4) return 'Small Square';
+  if (sides === 5) return 'Pentagon';
   if (sides === 6) return 'Hexagon';
   if (sides === 8) return 'Octagon';
+  if (sides === 10) return 'Decagon';
   
   if (sides === 3) {
     const t = pf.triangles[0];
