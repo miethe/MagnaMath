@@ -1,5 +1,7 @@
 # MagnaMath
 
+> **A new version lives here:** [miethe/magnamath-lab](https://github.com/miethe/magnamath-lab) (MagnaMath 0.4.0, MIT) with a live demo at [nick.miethe.dev/magnamath-lab](https://nick.miethe.dev/magnamath-lab/). This repository is the earlier version and is no longer developed.
+
 MagnaMath is an interactive, educational web application designed for exploring complex 3D geometries, understanding their mathematical properties, and generating 2D flat patterns (nets) specifically tailored for magnetic building tiles (like Magna-Tiles).
 
 ## 🌟 Features
